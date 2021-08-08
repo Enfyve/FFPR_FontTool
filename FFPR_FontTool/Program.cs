@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -57,7 +58,15 @@ namespace FFPR_FontTool
         {
             try
             {
-                byte[] cipherText = File.ReadAllBytes(inFile);
+                List<byte> cipherText = new List<byte>(File.ReadAllBytes(inFile));
+
+                // Pad with 32 bytes
+                cipherText.AddRange(new byte[] {
+                    0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0 });
+
                 byte[] salt = Encoding.UTF8.GetBytes(saltString);
 
                 RijndaelManaged r = new RijndaelManaged();
@@ -75,7 +84,7 @@ namespace FFPR_FontTool
 
                     MemoryStream encryptionStreamBacking = new MemoryStream();
                     CryptoStream encrypt = new CryptoStream(encryptionStreamBacking, r.CreateEncryptor(), CryptoStreamMode.Write);
-                    encrypt.Write(cipherText, 0, cipherText.Length);
+                    encrypt.Write(cipherText.ToArray(), 0, cipherText.Count);
                     encrypt.Flush();
 
                     encryptionStreamBacking.Seek(0, SeekOrigin.Begin);
@@ -95,41 +104,79 @@ namespace FFPR_FontTool
             return true;
         }
 
+        static void ShowUsage()
+        {
+            Console.WriteLine("Usage: FFPR_Tool.exe [-D|-E] <input file> <output file>");
+            Console.ReadLine();
+        }
 
         static void Main(string[] args)
         {
             bool success = false;
+            string inFile;
+            string outFile;
 
-            Console.Write("Input file: ");
-            string inFile = @"" + Console.ReadLine().Trim('\"');
-
-            Console.Write("Output file: ");
-            string outFile = @"" + Console.ReadLine().Trim('\"');
-
-            Console.Write("encrypt/decrypt? (E/D): ");
-            var key = Console.ReadKey();
-            Console.WriteLine();
-            if (key.Key == ConsoleKey.E)
+            if (args.Length == 1 && args[0].ToLower() == "-h")
             {
-                success = Encrypt(inFile, outFile);
+                ShowUsage();
+                return;
             }
-            else if (key.Key == ConsoleKey.D)
+            if (args.Length == 3)
             {
-                success = Decrypt(inFile, outFile);
+                inFile = @"" + args[1].Trim('\"');
+                outFile = @"" + args[2].Trim('\"');
+
+                switch (args[0].ToLower())
+                {
+                    case "-d":
+                        success = Decrypt(inFile, outFile);
+                        break;
+                    case "-e":
+                        success = Encrypt(inFile, outFile);
+                        break;
+                    default:
+                        ShowUsage();
+                        return;
+                }
             }
             else
             {
-                Console.WriteLine("Unrecognized response.");
-                Console.ReadKey();
-                return;
+
+                Console.Write("encrypt/decrypt? (E/D): ");
+                var key = Console.ReadKey();
+
+                Console.Write("Input file: ");
+                inFile = @"" + Console.ReadLine().Trim('\"');
+
+                Console.Write("Output file: ");
+                outFile = @"" + Console.ReadLine().Trim('\"');
+
+                Console.WriteLine();
+                if (key.Key == ConsoleKey.E)
+                {
+                    success = Encrypt(inFile, outFile);
+                }
+                else if (key.Key == ConsoleKey.D)
+                {
+                    success = Decrypt(inFile, outFile);
+                }
+                else
+                {
+                    Console.WriteLine("Unrecognized response.");
+                    Console.ReadKey();
+                    return;
+                }
             }
 
             if (success)
+            {
                 Console.WriteLine("Success.");
+            }
             else
+            {
                 Console.WriteLine("Failed to process file.");
-
-            Console.ReadKey();
+                Console.ReadKey();
+            }
 
             return;
         }
